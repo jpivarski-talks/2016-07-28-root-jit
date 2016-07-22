@@ -112,7 +112,7 @@ with ROOT & JIT-compilation & 219 & \textcolor{red}{196} & \textcolor{red}{0.98}
 \end{tabular}
 \end{frame}
 
-\begin{frame}[fragile]{ROOT code that was used}
+\begin{frame}[fragile]{ROOT code in the test}
 
 \vspace{0.3 cm}
 \hfill \textcolor{darkblue}{C++ ROOT}
@@ -122,12 +122,12 @@ with ROOT & JIT-compilation & 219 & \textcolor{red}{196} & \textcolor{red}{0.98}
 \begin{lstlisting}[language=cpp]
 TH1D control1("control1", "", 100, -10, 10);
 // start stopwatch
-ttree->SetBranchAddress("noholes", &input_noholes);
-ttree->SetBranchAddress("boolean", &input_boolean);
+ttree->SetBranchAddress("x", &input_x);
+ttree->SetBranchAddress("y", &input_y);
 for (i = 0;  i < ttreeEntries;  ++i) {
   root_ttree->GetEntry(i);
-  if (!input_boolean)
-    control1.Fill(2 * input_noholes);
+  if (!input_y)
+    control1.Fill(2 * input_x);
 }
 // end stopwatch
 \end{lstlisting}
@@ -141,8 +141,8 @@ for (i = 0;  i < ttreeEntries;  ++i) {
 control2 = ROOT.TH1D("control2", "", 100, -10, 10)
 # start stopwatch
 for entry in root_ttree:
-    if not entry.boolean:
-        control2.Fill(2 * entry.noholes)
+    if not entry.y:
+        control2.Fill(2 * entry.x)
 # end stopwatch
 \end{lstlisting}
 \end{minipage}
@@ -154,14 +154,13 @@ for entry in root_ttree:
 \begin{lstlisting}[language=python]
 control3 = ROOT.TH1D("control3", "", 100, -10, 10)
 # start stopwatch
-root_ttree.Draw("2 * noholes >>+ control3", "!boolean",
-    "goff")
+root_ttree.Draw("2 * x >>+ control3", "!y", "goff")
 # end stopwatch
 \end{lstlisting}
 \end{minipage}
 \end{frame}
 
-\begin{frame}[fragile]{Histogrammar code that was used}
+\begin{frame}[fragile]{Histogrammar code in the test}
 \vspace{0.3 cm}
 
 \hfill \textcolor{darkblue}{pure Python}
@@ -170,18 +169,18 @@ root_ttree.Draw("2 * noholes >>+ control3", "!boolean",
 \begin{minipage}{0.8\linewidth}
 \begin{lstlisting}[language=python]
 class Entry(object):
-    __slots__ = ["boolean", "noholes"]
-    def __init__(self, boolean, noholes):
-        self.boolean = boolean
-        self.noholes = noholes
+    __slots__ = ["y", "x"]
+    def __init__(self, y, x):
+        self.y = y
+        self.x = x
 \end{lstlisting}
 \end{minipage}
 
 \vspace{-0.25 cm}
 \begin{minipage}{\linewidth}
 \begin{lstlisting}[language=python]
-experiment1 = Select(lambda t: not t.boolean,
-                  Bin(100, -10, 10, lambda t: 2 * t.noholes))
+experiment1 = Select(lambda t: not t.y,
+                  Bin(100, -10, 10, lambda t: 2 * t.x))
 # start stopwatch
 for t in list_of_entries:
     experiment1.fill(t)
@@ -194,14 +193,14 @@ for t in list_of_entries:
 \vspace{-0.5 cm}
 \begin{minipage}{0.8\linewidth}
 \begin{lstlisting}[language=python]
-experiment2 = Select("logical_not(boolean)",
+experiment2 = Select("logical_not(y)",
 \end{lstlisting}
 \end{minipage}
 
 \vspace{-0.45 cm}
 \begin{minipage}{\linewidth}
 \begin{lstlisting}[language=python]
-                  Bin(100, -10, 10, "2 * noholes"))
+                  Bin(100, -10, 10, "2 * x"))
 # start stopwatch
 experiment2.numpy(dict_of_numpy_arrays)
 # end stopwatch
@@ -213,14 +212,14 @@ experiment2.numpy(dict_of_numpy_arrays)
 \vspace{-0.5 cm}
 \begin{minipage}{0.8\linewidth}
 \begin{lstlisting}[language=python]
-experiment3 = Select("!boolean",
+experiment3 = Select("!y",
 \end{lstlisting}
 \end{minipage}
 
 \vspace{-0.45 cm}
 \begin{minipage}{\linewidth}
 \begin{lstlisting}[language=python]
-                  Bin(100, -10, 10, "2 * noholes"))
+                  Bin(100, -10, 10, "2 * x"))
 # start stopwatch
 experiment3.cling(root_ttree)
 # end stopwatch
@@ -233,7 +232,7 @@ experiment3.cling(root_ttree)
 Python call generates specific C++ code, compiled by gInterpreter.
 
 \begin{lstlisting}[language=python]
-experiment3 = Select("!boolean", Bin(100, -10, 10, "2*noholes"))
+experiment3 = Select("!y", Bin(100, -10, 10, "2*x"))
 experiment3.cling(root_ttree)
 \end{lstlisting}
 
@@ -258,8 +257,8 @@ public:
 
   double weight_0;
   double weight_1;
-  Int_t input_boolean;
-  double input_noholes;
+  Int_t input_y;
+  double input_x;
   double quantity_0;
   double quantity_1;
   int bin_0;
@@ -279,15 +278,15 @@ public:
       storage.cut.values[bin_0] = 0.0;
     }
     weight_0 = 1.0;
-    ttree->SetBranchAddress("noholes", &input_noholes);
-    ttree->SetBranchAddress("boolean", &input_boolean);
+    ttree->SetBranchAddress("x", &input_x);
+    ttree->SetBranchAddress("y", &input_y);
 
     if (start < 0) start = 0;
     if (end < 0) end = ttree->GetEntries();
     for (;  start < end;  ++start) {
       ttree->GetEntry(start);
-      quantity_0 = !input_boolean;
-      quantity_1 = 2 * input_noholes;
+      quantity_0 = !input_y;
+      quantity_1 = 2 * input_x;
       storage.entries += weight_0;
       if (!isnan(quantity_0)  &&  quantity_0 > 0.0) {
         weight_1 = weight_0 * quantity_0;
@@ -338,7 +337,7 @@ C++ empty for loop & 5 ms \\
 ROOT C++ and Histogrammar-Cling are equivalent because they both call {\tt\small ttree->GetEntry(i)}, which takes 90\% of the time.
 \end{frame}
 
-\begin{frame}[fragile]{How this looks in a physics analysis}
+\begin{frame}[fragile]{Analysis code must be declarative to use it}
 \vspace{0.1 cm}
 \begin{lstlisting}[language=python]
 from ROOT import *; from histogrammar import *             
@@ -370,27 +369,30 @@ tstack.root("backgrounds").Draw()      # get ordinary ROOT plots
 \end{frame}
 
 \begin{frame}{}
-The fact that the analysis code is not imperative is what makes it possible to fill it different ways.
+The fact that the analyst's histogramming code is not imperative is what makes it {\it possible} to fill it in different ways.
 \end{frame}
 
 \begin{frame}{See more at http://histogrammar.org}
 \vspace{0.5 cm}
-Currently available:
+
+\textcolor{darkblue}{Currently available:}
 \begin{itemize}
-\item Distributed filling, e.g. in Apache Spark (on the JVM)
+\item Distributed filling, e.g. across a Spark cluster (JVM/Python)
 \item Spark-SQL enhancement
-\item Pure Python
-\item Numpy acceleration
-\item \textcolor{darkblue}{ROOT-Cling acceleration:} valuable to ordinary physicists doing ordinary analyses
+\item Numpy acceleration: for Scikit-Learn, etc.
+\item ROOT-Cling acceleration: valuable to ordinary physicists doing ordinary analyses
 \end{itemize}
 
 \vfill
-Forseen/in progress:
+\textcolor{darkblue}{Forseen/in progress:}
 \begin{itemize}
-\item Julia (a language designed around JIT)
+\item Julia (a language designed around JIT-compilation)
 \item GPU (me) and FPGA (Peter Hansen): for debugging workflows in remote environments, like trigger development
 \item JIT-Java code, R, Javascript: for industry
 \end{itemize}
+
+\vspace{0.25 cm}
+All languages use the same suite of 20 aggregation primitives.
 \end{frame}
 
 \begin{frame}{Proposal/request}
@@ -398,10 +400,7 @@ When a Histogrammar version 1.0 is reached, can we bundle it in the PyROOT distr
 
 \begin{uncoverenv}<2->
 \vspace{0.5 cm}
-So far, only 4 of the 20 histogram primitives have been accelerated.
-
-\vspace{0.5 cm}
-Histogrammar-Python has no explicit dependencies (e.g. Numpy will work if Numpy is available); just Python code.
+It has no explicit dependencies (e.g. Numpy will work if Numpy is available, doesn't complain if it's not).
 
 \vspace{0.5 cm}
 It should be made to interact well with the new ``chains of functional primitives'' and parallel TTree reading.
@@ -428,6 +427,8 @@ These values were constant throughout the test:
     TFile::GetBytesRead() = 8031424
     TFile::GetReadCalls() = 5
 \end{lstlisting}
+
+\small So {\tt\small ttree->GetEntry(i)} isn't the bottleneck due to disk I/O.
 \end{frame}
 
 \end{document}
