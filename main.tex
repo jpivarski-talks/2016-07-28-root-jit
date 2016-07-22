@@ -369,7 +369,7 @@ tstack.root("backgrounds").Draw()      # get ordinary ROOT plots
 \end{frame}
 
 \begin{frame}{}
-The fact that the analyst's histogramming code is not imperative is what makes it {\it possible} to fill it in different ways.
+The fact that the analyst's histogramming code is not imperative is what makes it {\it possible} to fill in different ways.
 \end{frame}
 
 \begin{frame}{See more at http://histogrammar.org}
@@ -380,7 +380,7 @@ The fact that the analyst's histogramming code is not imperative is what makes i
 \item Distributed filling, e.g. across a Spark cluster (JVM/Python)
 \item Spark-SQL enhancement
 \item Numpy acceleration: for Scikit-Learn, etc.
-\item ROOT-Cling acceleration: valuable to ordinary physicists doing ordinary analyses
+\item ROOT-Cling acceleration: already valuable to ordinary physicists doing ordinary analyses
 \end{itemize}
 
 \vfill
@@ -401,6 +401,9 @@ When a Histogrammar version 1.0 is reached, can we bundle it in the PyROOT distr
 \begin{uncoverenv}<2->
 \vspace{0.5 cm}
 It has no explicit dependencies (e.g. Numpy will work if Numpy is available, doesn't complain if it's not).
+
+\vspace{0.5 cm}
+Continually tested in Pythons 2.6 (SL6), 2.7, and 3.4.
 
 \vspace{0.5 cm}
 It should be made to interact well with the new ``chains of functional primitives'' and parallel TTree reading.
