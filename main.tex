@@ -31,7 +31,7 @@
 
 \lstset{ %
   backgroundcolor=\color{white},      % choose the background color
-  basicstyle=\ttfamily\small,         % size of fonts used for the code
+  basicstyle=\ttfamily\scriptsize,         % size of fonts used for the code
   breaklines=true,                    % automatic line breaking only at whitespace
   captionpos=b,                       % sets the caption-position to bottom
   commentstyle=\color{commentgreen},  % comment style
@@ -59,10 +59,21 @@
   morestring=[b]"""
 }
 
-\title[Your Short Title]{Your Presentation}
-\author{You}
-\institute{Where You're From -- DIANA}
-\date{Date of Presentation}
+\lstdefinelanguage{cpp}{
+  morekeywords={for,if,class,public,typedef,struct,double,return,Int_t,int,void,Long64_t},
+  otherkeywords={=>,<-,<\%,<:,>:,\#,@},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[n]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+  morestring=[b]"""
+}
+
+\title[2016-07-28-root-jit]{Histogram abstraction as fast as C++}
+\author{Jim Pivarski}
+\institute{Princeton University -- DIANA}
+\date{July 28, 2016}
 
 \begin{document}
 
@@ -79,95 +90,541 @@
 %  \tableofcontents
 %\end{frame}
 
-\section{Introduction}
+\begin{frame}{Histogram abstraction as fast as C++}
+\vspace{0.25 cm}
+Wall time to fill 100-bin histogram with {\tt \small 2*x}, selecting on {\tt \small !y}.
 
-\begin{frame}{Introduction}
+TTree has 1 million entries, fully loaded into TTreeCache.
 
-\begin{itemize}
-  \item Your introduction goes here!
-  \item Use \texttt{itemize} to organize your main points.
-\end{itemize}
-
-\vskip 1cm
-
-\begin{block}{Examples}
-Some examples of commonly used commands and features are included, to help you get started.
-\end{block}
-
-\end{frame}
-
-\section{Some \LaTeX{} Examples}
-
-\subsection{Tables and Figures}
-
-\begin{frame}{Tables and Figures}
-
-\begin{itemize}
-\item Use \texttt{tabular} for basic tables --- see Table~\ref{tab:widgets}, for example.
-\item You can upload a figure (JPEG, PNG or PDF) using the files menu. 
-\item To include it in your document, use the \texttt{includegraphics} command (see the comment below in the source code).
-\end{itemize}
-
-% Commands to include a figure:
-%\begin{figure}
-%\includegraphics[width=\textwidth]{your-figure's-file-name}
-%\caption{\label{fig:your-figure}Caption goes here.}
-%\end{figure}
-
-\begin{table}
-\centering
-\begin{tabular}{l|r}
-Item & Quantity \\\hline
-Widgets & 42 \\
-Gadgets & 13
+\renewcommand{\arraystretch}{1.2}
+\vspace{0.25 cm}
+\begin{tabular}{l c c c c}
+\textcolor{darkblue}{ROOT} & & & & \\
+Fill method & Preparation & Prep (ms) & Run (ms) & Relative \\\hline
+C++ & compilation & 12.6 & \textcolor{red}{198} & \textcolor{red}{1} \\
+PyROOT & none & & 15,700 & 79 \\
+TFormula & first pass & 380 & 317 & 1.6\vspace{0.25 cm} \\
+\textcolor{darkblue}{Histogrammar} & & & & \\
+Fill method & Preparation & Prep (ms) & Run (ms) & Relative \\\hline
+pure Python & none & & 21,000 & 105 \\
+with Numpy & first pass & 814 & 312 & 1.6 \\
+with ROOT & JIT-compilation & 219 & \textcolor{red}{196} & \textcolor{red}{0.98} \\
 \end{tabular}
-\caption{\label{tab:widgets}An example table.}
-\end{table}
-
 \end{frame}
 
-\subsection{Mathematics}
+\begin{frame}[fragile]{ROOT code that was used}
 
-\begin{frame}{Readable Mathematics}
+\vspace{0.3 cm}
+\hfill \textcolor{darkblue}{C++ ROOT}
 
-Let $X_1, X_2, \ldots, X_n$ be a sequence of independent and identically distributed random variables with $\text{E}[X_i] = \mu$ and $\text{Var}[X_i] = \sigma^2 < \infty$, and let
-$$S_n = \frac{X_1 + X_2 + \cdots + X_n}{n}
-      = \frac{1}{n}\sum_{i}^{n} X_i$$
-denote their mean. Then as $n$ approaches infinity, the random variables $\sqrt{n}(S_n - \mu)$ converge in distribution to a normal $\mathcal{N}(0, \sigma^2)$.
+\vspace{-0.5 cm}
+\begin{minipage}{0.8\linewidth}
+\begin{lstlisting}[language=cpp]
+TH1D control1("control1", "", 100, -10, 10);
+// start stopwatch
+ttree->SetBranchAddress("noholes", &input_noholes);
+ttree->SetBranchAddress("boolean", &input_boolean);
+for (i = 0;  i < ttreeEntries;  ++i) {
+  root_ttree->GetEntry(i);
+  if (!input_boolean)
+    control1.Fill(2 * input_noholes);
+}
+// end stopwatch
+\end{lstlisting}
+\end{minipage}
 
+\hfill \textcolor{darkblue}{PyROOT}
+
+\vspace{-0.5 cm}
+\begin{minipage}{0.8\linewidth}
+\begin{lstlisting}[language=python]
+control2 = ROOT.TH1D("control2", "", 100, -10, 10)
+# start stopwatch
+for entry in root_ttree:
+    if not entry.boolean:
+        control2.Fill(2 * entry.noholes)
+# end stopwatch
+\end{lstlisting}
+\end{minipage}
+
+\hfill \textcolor{darkblue}{TFormula}
+
+\vspace{-0.5 cm}
+\begin{minipage}{0.8\linewidth}
+\begin{lstlisting}[language=python]
+control3 = ROOT.TH1D("control3", "", 100, -10, 10)
+# start stopwatch
+root_ttree.Draw("2 * noholes >>+ control3", "!boolean",
+    "goff")
+# end stopwatch
+\end{lstlisting}
+\end{minipage}
 \end{frame}
 
-\subsection{Code}
+\begin{frame}[fragile]{Histogrammar code that was used}
+\vspace{0.3 cm}
 
-\begin{frame}[fragile]{Readable Code}
+\hfill \textcolor{darkblue}{pure Python}
+
+\vspace{-0.5 cm}
+\begin{minipage}{0.8\linewidth}
+\begin{lstlisting}[language=python]
+class Entry(object):
+    __slots__ = ["boolean", "noholes"]
+    def __init__(self, boolean, noholes):
+        self.boolean = boolean
+        self.noholes = noholes
+\end{lstlisting}
+\end{minipage}
+
+\vspace{-0.25 cm}
+\begin{minipage}{\linewidth}
+\begin{lstlisting}[language=python]
+experiment1 = Select(lambda t: not t.boolean,
+                  Bin(100, -10, 10, lambda t: 2 * t.noholes))
+# start stopwatch
+for t in list_of_entries:
+    experiment1.fill(t)
+# end stopwatch
+\end{lstlisting}
+\end{minipage}
+
+\hfill \textcolor{darkblue}{with Numpy}
+
+\vspace{-0.5 cm}
+\begin{minipage}{0.8\linewidth}
+\begin{lstlisting}[language=python]
+experiment2 = Select("logical_not(boolean)",
+\end{lstlisting}
+\end{minipage}
+
+\vspace{-0.45 cm}
+\begin{minipage}{\linewidth}
+\begin{lstlisting}[language=python]
+                  Bin(100, -10, 10, "2 * noholes"))
+# start stopwatch
+experiment2.numpy(dict_of_numpy_arrays)
+# end stopwatch
+\end{lstlisting}
+\end{minipage}
+
+\hfill \textcolor{darkblue}{with ROOT}
+
+\vspace{-0.5 cm}
+\begin{minipage}{0.8\linewidth}
+\begin{lstlisting}[language=python]
+experiment3 = Select("!boolean",
+\end{lstlisting}
+\end{minipage}
+
+\vspace{-0.45 cm}
+\begin{minipage}{\linewidth}
+\begin{lstlisting}[language=python]
+                  Bin(100, -10, 10, "2 * noholes"))
+# start stopwatch
+experiment3.cling(root_ttree)
+# end stopwatch
+\end{lstlisting}
+\end{minipage}
+\end{frame}
+
+\begin{frame}[fragile]{What Histogrammar-ROOT does}
+\vspace{0.35 cm}
+Python call generates specific C++ code, compiled by gInterpreter.
+
+\begin{lstlisting}[language=python]
+experiment3 = Select("!boolean", Bin(100, -10, 10, "2*noholes"))
+experiment3.cling(root_ttree)
+\end{lstlisting}
+
+\begin{columns}
+\column{0.35\linewidth}
+\begin{lstlisting}[language=cpp, basicstyle=\ttfamily\fontsize{5}{4}\selectfont]
+class HistogrammarClingFiller_0 {
+public:
+  typedef struct {
+    double entries;
+    double underflow;
+    double overflow;
+    double nanflow;
+    double values[100];
+    double& getValues(int i) { return values[i]; }
+  } Bn100CtCtCtCt;
+
+  typedef struct {
+    double entries;
+    Bn100CtCtCtCt cut;
+  } SeBn100CtCtCtCt;
+
+  double weight_0;
+  double weight_1;
+  Int_t input_boolean;
+  double input_noholes;
+  double quantity_0;
+  double quantity_1;
+  int bin_0;
+  SeBn100CtCtCtCt storage;
+
+  void fillall(TTree* ttree, Long64_t start, Long64_t end) {
+    storage.entries = 0.0;
+    storage.cut.entries = 0.0;
+\end{lstlisting}
+
+\column{0.35\linewidth}
+\begin{lstlisting}[language=cpp, basicstyle=\ttfamily\fontsize{5}{4}\selectfont]
+    storage.cut.nanflow = 0.0;
+    storage.cut.underflow = 0.0;
+    storage.cut.overflow = 0.0;
+    for (bin_0 = 0;  bin_0 < 100;  ++bin_0) {
+      storage.cut.values[bin_0] = 0.0;
+    }
+    weight_0 = 1.0;
+    ttree->SetBranchAddress("noholes", &input_noholes);
+    ttree->SetBranchAddress("boolean", &input_boolean);
+
+    if (start < 0) start = 0;
+    if (end < 0) end = ttree->GetEntries();
+    for (;  start < end;  ++start) {
+      ttree->GetEntry(start);
+      quantity_0 = !input_boolean;
+      quantity_1 = 2 * input_noholes;
+      storage.entries += weight_0;
+      if (!isnan(quantity_0)  &&  quantity_0 > 0.0) {
+        weight_1 = weight_0 * quantity_0;
+\end{lstlisting}
+
+\column{0.35\linewidth}
+\begin{lstlisting}[language=cpp, basicstyle=\ttfamily\fontsize{5}{4}\selectfont]
+        storage.cut.entries += weight_1;
+        if (isnan(quantity_1)) {
+          storage.cut.nanflow += weight_1;
+        }
+        else if (quantity_1 < -10.0) {
+          storage.cut.underflow += weight_1;
+        }
+        else if (quantity_1 >= 10.0) {
+          storage.cut.overflow += weight_1;
+        }
+        else {
+          bin_0 = floor((quantity_1 - -10.0) * 5.0);
+          storage.cut.values[bin_0] += weight_1;
+        }
+      }
+    }
+
+    ttree->ResetBranchAddresses();
+  }
+};
+\end{lstlisting}
+\end{columns}
+
+One contiguous block of memory; no allocations in loop; just ``{\tt\scriptsize if}.''
+\end{frame}
+
+\begin{frame}{Dissect the differences}
+\vspace{0.5 cm}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l c}
+ROOT C++ with TTree read and histogram fill & 198 ms \\
+ROOT C++ filling histogram with zeros & 25 ms \\
+C++ empty for loop & 5 ms \\
+ & \\
+Histogrammar-Cling with TTree read and histogram fill & 196 ms \\
+Histogrammar-Cling filling histogram with zeros & 19 ms \\
+C++ empty for loop & 5 ms \\
+\end{tabular}
+
+\vspace{1 cm}
+ROOT C++ and Histogrammar-Cling are equivalent because they both call {\tt\small ttree->GetEntry(i)}, which takes 90\% of the time.
+\end{frame}
+
+\begin{frame}[fragile]{How this looks in a physics analysis}
+\vspace{0.1 cm}
+\begin{lstlisting}[language=python]
+from ROOT import *; from histogrammar import *             
+gInterpreter.AddIncludePath("Event.h")         # works for
+gInterpreter.ProcessLine(".L Event.cxx")       # complex events
+tfileData = TFile("data.root"); data = tfileEvent.Get("Events")
+tfileMC1 = TFile("mc1.root"); mc1 = tfileEvent.Get("Events")
+tfileMC2 = TFile("mc2.root"); mc2 = tfileEvent.Get("Events")
+
+plots = UntypedLabel(           # book all aggregators together
+    mass = Bin(100, 0, 50, "event.dijet.mass()"),  # quoted C++
+    pt =   Bin(100, 0, 300, "event.dijet.pt()"),      # hist
+    profile = Bin(100, 0, 300, "event.dijet.pt()",    # prof
+                  Deviate("event.dijet.eta()")),
+    twodim =  Bin(100, 0, 300, "event.dijet.pt()",    # 2D
+                  Bin(100, -5, 5, "event.dijet.eta()")),
+    trigeff = Fraction("trigger",                     # eff
+                  Bin(100, 0, 300, "event.maxjet.pt()")))
+
+plotsData = plots.copy().cling(data)   # fill all at once
+plotsMC1 = plots.copy().cling(mc1)     # for each sample
+plotsMC2 = plots.copy().cling(mc2)
+
+tefficiency = plotsData.get("trigeff").root("efficiency vs pt")
+tefficiency.Draw()
+tstack = Stack.build(plotsMC1.get("mass"), plotsMC2.get("mass"))
+tstack.root("backgrounds").Draw()      # get ordinary ROOT plots
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{}
+The fact that the analysis code is not imperative is what makes it possible to fill it different ways.
+\end{frame}
+
+\begin{frame}{See more at http://histogrammar.org}
+\vspace{0.5 cm}
+Currently available:
+\begin{itemize}
+\item Distributed filling, e.g. in Apache Spark (on the JVM)
+\item Spark-SQL enhancement
+\item Pure Python
+\item Numpy acceleration
+\item \textcolor{darkblue}{ROOT-Cling acceleration:} valuable to ordinary physicists doing ordinary analyses
+\end{itemize}
+
+\vfill
+Forseen/in progress:
+\begin{itemize}
+\item Julia (a language designed around JIT)
+\item GPU (me) and FPGA (Peter Hansen): for debugging workflows in remote environments, like trigger development
+\item JIT-Java code, R, Javascript: for industry
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Proposal/request}
+When a Histogrammar version 1.0 is reached, can we bundle it in the PyROOT distribution?
+
+\begin{uncoverenv}<2->
+\vspace{0.5 cm}
+So far, only 4 of the 20 histogram primitives have been accelerated.
 
 \vspace{0.5 cm}
+Histogrammar-Python has no explicit dependencies (e.g. Numpy will work if Numpy is available); just Python code.
 
-Remember to mark the frame as ``fragile'' for verbatim.
+\vspace{0.5 cm}
+It should be made to interact well with the new ``chains of functional primitives'' and parallel TTree reading.
+\end{uncoverenv}
+\end{frame}
 
-\begin{lstlisting}[language=c, frame=single]
-auto output = std::vector<Result>();
-for (i = 0;  i < nEvents;  i++) {   // C++ code!
-    event = events(i);
-    if (condition(event))
-        continue;
-    output.push_back(calculation(event));
-}
+\begin{frame}[fragile]{Backup: evidence that TTreeCache is filled}
+\scriptsize
+\begin{lstlisting}
+TFile::PrintCacheStats()
+
+******TreeCache statistics for tree: big in file: test/big.root ******
+Number of branches in the cache ...: 2
+Cache Efficiency ..................: 1.000000
+Cache Efficiency Rel...............: 1.000000
+Learn entries......................: 100
+Cached Reading.....................: 8022693 bytes in 1 transactions
+Reading............................: 0 bytes in 0 uncached transactions
+Readahead..........................: 256000 bytes with overhead = 0 bytes
+Average transaction................: 8022.693000 Kbytes
+Number of blocks in current cache..: 377, total size: 8022693
+
+These values were constant throughout the test:
+    TFile::GetBytesRead() = 8031424
+    TFile::GetReadCalls() = 5
 \end{lstlisting}
-
-\begin{lstlisting}[language=python, frame=single]
-output = []                         # Python code!
-for event in events:
-    if condition(event):
-        continue
-    output.append(calculation(event))
-\end{lstlisting}
-
-\begin{lstlisting}[language=scala, frame=single]
-val output: Seq[Result] =           // Scala code!
-  events.filter(condition).map(calculation)
-\end{lstlisting}
-
 \end{frame}
 
 \end{document}
+
+%% TFile::PrintCacheStats()
+
+%% ******TreeCache statistics for tree: big in file: test/big.root ******
+%% Number of branches in the cache ...: 2
+%% Cache Efficiency ..................: 1.000000
+%% Cache Efficiency Rel...............: 1.000000
+%% Learn entries......................: 100
+%% Cached Reading.....................: 8022693 bytes in 1 transactions
+%% Reading............................: 0 bytes in 0 uncached transactions
+%% Readahead..........................: 256000 bytes with overhead = 0 bytes
+%% Average transaction................: 8022.693000 Kbytes
+%% Number of blocks in current cache..: 377, total size: 8022693
+
+%% These values were constant throughout the test:
+%%     TFile::GetBytesRead() = 8031424
+%%     TFile::GetReadCalls() = 5
+
+%% line |
+%%    1 | class HistogrammarClingFiller_0 {
+%%    2 | public:
+%%    3 |
+%%    4 |   typedef struct {
+%%    5 |     double entries;
+%%    6 |     double underflow;
+%%    7 |     double overflow;
+%%    8 |     double nanflow;
+%%    9 |     double values[100];
+%%   10 |     double& getValues(int i) { return values[i]; }
+%%   11 |   } Bn100CtCtCtCt;
+%%   12 |
+%%   13 |   typedef struct {
+%%   14 |     double entries;
+%%   15 |     Bn100CtCtCtCt cut;
+%%   16 |   } SeBn100CtCtCtCt;
+%%   17 |
+%%   18 |   double weight_0;
+%%   19 |   double weight_1;
+%%   20 |   Int_t input_boolean;
+%%   21 |   double input_noholes;
+%%   22 |
+%%   23 |   double quantity_0;
+%%   24 |   double quantity_1;
+%%   25 |   int bin_0;
+%%   26 |   SeBn100CtCtCtCt storage;
+%%   27 |
+%%   28 |   bool isnan(double x) { return x != x; }
+%%   29 |   bool isnan(float x) { return x != x; }
+%%   30 |   bool isnan(int x) { return false; }
+%%   31 |
+%%   32 |   void fillall(TTree* ttree, Long64_t start, Long64_t end) {
+%%   33 |     storage.entries = 0.0;
+%%   34 |     storage.cut.entries = 0.0;
+%%   35 |     storage.cut.nanflow = 0.0;
+%%   36 |     storage.cut.underflow = 0.0;
+%%   37 |     storage.cut.overflow = 0.0;
+%%   38 |     for (bin_0 = 0;  bin_0 < 100;  ++bin_0) {
+%%   39 |       storage.cut.values[bin_0] = 0.0;
+%%   40 |     }
+%%   41 |     weight_0 = 1.0;
+%%   42 |     ttree->SetBranchAddress("noholes", &input_noholes);
+%%   43 |     ttree->SetBranchAddress("boolean", &input_boolean);
+%%   44 |
+%%   45 |     if (start < 0) start = 0;
+%%   46 |     if (end < 0) end = ttree->GetEntries();
+%%   47 |     for (;  start < end;  ++start) {
+%%   48 |       ttree->GetEntry(start);
+%%   49 |       quantity_0 = !input_boolean;
+%%   50 |       quantity_1 = 2 * input_noholes;
+%%   51 |       storage.entries += weight_0;
+%%   52 |       if (!isnan(quantity_0)  &&  quantity_0 > 0.0) {
+%%   53 |         weight_1 = weight_0 * quantity_0;
+%%   54 |         storage.cut.entries += weight_1;
+%%   55 |         if (isnan(quantity_1)) {
+%%   56 |           storage.cut.nanflow += weight_1;
+%%   57 |         }
+%%   58 |         else if (quantity_1 < -10.0) {
+%%   59 |           storage.cut.underflow += weight_1;
+%%   60 |         }
+%%   61 |         else if (quantity_1 >= 10.0) {
+%%   62 |           storage.cut.overflow += weight_1;
+%%   63 |         }
+%%   64 |         else {
+%%   65 |           bin_0 = floor((quantity_1 - -10.0) * 5.0);
+%%   66 |           storage.cut.values[bin_0] += weight_1;
+%%   67 |         }
+%%   68 |       }
+%%   69 |     }
+%%   70 |
+%%   71 |     ttree->ResetBranchAddresses();
+%%   72 |   }
+%%   73 | };
+
+%% class ControlTest {
+%% public:
+%%   TH1D histogram;
+%% 
+%%   ControlTest() : histogram("control1", "", 100, -10, 10) {}
+%% 
+%%   Int_t input_boolean;
+%%   double input_noholes;
+%% 
+%%   void fillall(TTree* ttree, Long64_t start, Long64_t end) {
+%%     if (start < 0) start = 0;
+%%     if (end < 0) end = ttree->GetEntries();
+%% 
+%%     ttree->SetBranchAddress("noholes", &input_noholes);
+%%     ttree->SetBranchAddress("boolean", &input_boolean);
+%% 
+%%     for (;  start < end;  ++start) {
+%%       ttree->GetEntry(start);
+%% 
+%%       if (!input_boolean)
+%%         histogram.Fill(2 * input_noholes);
+%%     }
+%% 
+%%     ttree->ResetBranchAddresses();
+%%   }
+%% };
+
+%% histogram = ROOT.TH1D("control2", "", 100, -10, 10)
+%% for row in TestRootCling.ttreeBig:
+%%     if not row.boolean:
+%%         histogram.Fill(2 * row.noholes)
+
+%% Histogrammar JIT-compilation
+%% 0.21904706955 -> 1.1003578233905158
+
+%% Histogrammar running
+%% 0.196442842484 -> 0.9868080820273187
+%% 0.195878982544 -> 0.9839755963083809
+%% 0.19778585434 -> 0.9935545480069445
+
+%% Histogrammar running without ttree->GetEntry(i) (fill with zeros)
+%% 0.0193800926208 -> 0.09735367187125231
+%% 0.0191719532013 -> 0.09630810737649194
+%% 0.019119977951 -> 0.09604701566954614
+
+%% Completely empty loop (in the Histogrammar test)
+%% 0.00551819801331 -> 0.02772003463656316
+%% 0.00556516647339 -> 0.027955975307250087
+%% 0.00550293922424 -> 0.027643383860256804
+
+%% ROOT C++ compilation
+%% 0.0126299858093 -> 0.06344528471951177
+
+%% ROOT C++ first event
+%% 0.0141220092773 -> 0.07094029343644556
+
+%% ROOT C++ subsequent
+%% 0.198187828064 -> 0.995573816892438
+%% 0.19960808754 -> 1.0027083274287882
+%% 0.199410915375 -> 1.0017178556787742
+
+%% ROOT C++ subsequent without ttree->GetEntry(i) (fill with zeros)
+%% 0.0239660739899 -> 0.12039082314553802
+%% 0.0246810913086 -> 0.12398263061462476
+%% 0.0245039463043 -> 0.1230927630087422
+
+%% Completely empty loop (in the ROOT C++ test)
+%% 0.00520300865173 -> 0.026136717039224343
+%% 0.00507307052612 -> 0.02548398777256311
+%% 0.00515604019165 -> 0.025900776368537416
+
+%% PyROOT first event
+%% 0.00721597671509 -> 0.03624863116482206
+
+%% PyROOT subsequent
+%% 15.7434358597 -> 79.08534385260707
+%% 15.7216258049 -> 78.97578354450955
+%% 15.6935698986 -> 78.83484791796619
+
+%% TFormula first pass
+%% 0.379606962204 -> 1.9069120236704813
+
+%% TFormula subsequent
+%% 0.317915201187 -> 1.597010539878666
+%% 0.316998958588 -> 1.5924079002998555
+%% 0.316241025925 -> 1.588600512522203
+
+%% Numpy first
+%% 0.814823865891 -> 4.093174208449328
+
+%% Numpy subsequent
+%% 0.309661865234 -> 1.5555508535947518
+%% 0.312314987183 -> 1.5688785073222755
+%% 0.313981056213 -> 1.5772478139522859
+
+%% Native Histogrammar
+
+%% Native first
+%% 20.7954871655 -> 104.4637439833533
+
+%% Native subsequent
+%% 21.058177948 -> 105.78334099165966
+%% 20.9882600307 -> 105.43211635553794
+%% 20.9792170525 -> 105.38668999201907
