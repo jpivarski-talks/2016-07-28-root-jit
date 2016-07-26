@@ -219,23 +219,6 @@ experiment3.cling(root_ttree)
 \end{minipage}
 \end{frame}
 
-\begin{frame}{Dissect the differences}
-\vspace{0.5 cm}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{l c}
-ROOT C++ with TTree read and histogram fill & 198 ms \\
-ROOT C++ filling histogram with zeros & 25 ms \\
-C++ empty for loop & 5 ms \\
- & \\
-Histogrammar-Cling with TTree read and histogram fill & 196 ms \\
-Histogrammar-Cling filling histogram with zeros & 19 ms \\
-C++ empty for loop & 5 ms \\
-\end{tabular}
-
-\vspace{1 cm}
-ROOT C++ and Histogrammar-Cling are equivalent because they both call {\tt\small ttree->GetEntry(i)}, which takes 90\% of the time.
-\end{frame}
-
 \begin{frame}{}
 \begin{center}
 \textcolor{darkblue}{\Large Back to the beginning for some context}
@@ -425,20 +408,33 @@ public:
 \end{itemize}
 \end{frame}
 
-\begin{frame}{What this means for a }
+\begin{frame}{What this means for analysis}
 
+\vspace{0.5 cm}
+\textcolor{darkblue}{Python users can turn TTrees into TCanvases at C++ speeds.}
 
+\begin{itemize}
+\item They have to describe their aggregation in terms of this 20-primitive language.
+\begin{itemize}
+\item like a generalization of TFormula
+\item but whole directories of histograms can be filled in one pass
+\end{itemize}
+\item They have to write their ``fill rules'' as declarative C99 expressions with TTree branches as free variables.
+\begin{itemize}
+\item dealing with bad identifier: {\tt\small "t($\backslash$"branch-name$\backslash$") + 3"}
+\item multi-line returns last statement: {\tt\small "auto tmp = init(); while (tmp.next()); tmp.value()"}
+\item derived quantities can be written globally for all fill rules \\ (e.g. find the leading jet once, use it in all rules).
+\item can still load C++ libraries for more complex functions
+\end{itemize}
+\item Aliases exist to make some composites more familiar:
 
+{\tt\small Profile(n, low, high, xRule, yRule, cutRule)}
 
-
-
+\item {\tt\small .cling(...)} fills with TTrees, {\tt\small .root(...)} returns TH1, TProfile, TH2, TEfficiency, etc.
+\end{itemize}
 \end{frame}
 
-
-
-
-
-\begin{frame}[fragile]{Analysis code must be declarative to use it}
+\begin{frame}[fragile]{Whole analysis example}
 \vspace{0.1 cm}
 \begin{lstlisting}[language=python]
 from ROOT import *; from histogrammar import *             
@@ -469,49 +465,68 @@ tstack.root("backgrounds").Draw()      # get ordinary ROOT plots
 \end{lstlisting}
 \end{frame}
 
-\begin{frame}{}
-The fact that the analyst's histogramming code is not imperative is what makes it {\it possible} to fill in different ways.
+\begin{frame}{Wishlist}
+\setlength{\itemsep}{0.5 cm}
+\begin{itemize}
+\item Implemented Cling-JIT for all primitives in {\tt\small histogrammar-python/master} with a full suite of tests.
+\item However, it only operates on TTree; should at least generalize to TChain.
+\item Better still, it should make use of Enric's parallel reading to escape Python GIL (one call from Python dispatches threads on the C++ side).
+\item Moreover, it's a natural fit for ``chains of functional primitives.'' All of Histogrammar's primitives are glorified reducers. Map, filter, and flatMap would greatly expand capabilities.
+\item Proposal/request: add Histogrammar as a part of PyROOT?
+\begin{itemize}
+\item pure Python; 2.6 (SL6), 2.7, 3.4 continuously tested
+\item no explicit dependencies (import statements are hidden)
+\end{itemize}
+\end{itemize}
 \end{frame}
 
-\begin{frame}{See more at http://histogrammar.org}
-\vspace{0.5 cm}
+\begin{frame}[fragile]{Last slide: possible inclusion in ROOT}
+\vspace{0.25 cm}
+Just the Python implementation, latest version for a some release of the Histogrammar specification (e.g. 0.9.x or 1.0.x).
 
-\textcolor{darkblue}{Currently available:}
-\begin{itemize}
-\item Distributed filling, e.g. across a Spark cluster (JVM/Python)
-\item Spark-SQL enhancement
-\item Numpy acceleration: for Scikit-Learn, etc.
-\item ROOT-Cling acceleration: already valuable to ordinary physicists doing ordinary analyses
-\end{itemize}
+\begin{center}
+\includegraphics[width=0.75\linewidth]{release_matrix.png}
+\end{center}
+
+Nested under {\tt\small import ROOT}, so that user can also install it standalone for another version, distinguishing namespaces as
+
+\hfill\begin{minipage}{0.95\linewidth}
+\begin{lstlisting}{language=python}
+import ROOT.histogrammar as hg09
+import histogrammar as hg10
+\end{lstlisting}
+\end{minipage}
 
 \vfill
-\textcolor{darkblue}{Forseen/in progress:}
-\begin{itemize}
-\item Julia (a language designed around JIT-compilation)
-\item GPU (me) and FPGA (Peter Hansen): for debugging workflows in remote environments, like trigger development
-\item JIT-Java code, R, Javascript: for industry
-\end{itemize}
-
-\vspace{0.25 cm}
-All languages use the same suite of 20 aggregation primitives.
+Target an upcoming ROOT 6 release, rather than ROOT 7?
 \end{frame}
 
-\begin{frame}{Proposal/request}
-When a Histogrammar version 1.0 is reached, can we bundle it in the PyROOT distribution?
+\begin{frame}{Backup: why not this syntax?}
 
-\begin{uncoverenv}<2->
-\vspace{0.5 cm}
-It has no explicit dependencies (e.g. Numpy will work if Numpy is available, doesn't complain if it's not).
 
-\vspace{0.5 cm}
-Continually tested in Pythons 2.6 (SL6), 2.7, and 3.4.
 
-\vspace{0.5 cm}
-It should be made to interact well with the new ``chains of functional primitives'' and parallel TTree reading.
-\end{uncoverenv}
+
+
 \end{frame}
 
-\begin{frame}[fragile]{Backup: evidence that TTreeCache is filled}
+\begin{frame}{Backup: time is dominated by TTree-reading}
+\vspace{0.5 cm}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l c}
+ROOT C++ with TTree read and histogram fill & 198 ms \\
+ROOT C++ filling histogram with zeros & 25 ms \\
+C++ empty for loop & 5 ms \\
+ & \\
+Histogrammar-Cling with TTree read and histogram fill & 196 ms \\
+Histogrammar-Cling filling histogram with zeros & 19 ms \\
+C++ empty for loop & 5 ms \\
+\end{tabular}
+
+\vspace{1 cm}
+ROOT C++ and Histogrammar-Cling filling times are nearly the same because they both call {\tt\small ttree->GetEntry(i)}, which takes 90\% of the time.
+\end{frame}
+
+\begin{frame}[fragile]{Backup: TTreeCache is enabled}
 \scriptsize
 \begin{lstlisting}
 TFile::PrintCacheStats()
@@ -531,8 +546,6 @@ These values were constant throughout the test:
     TFile::GetBytesRead() = 8031424
     TFile::GetReadCalls() = 5
 \end{lstlisting}
-
-\small So {\tt\small ttree->GetEntry(i)} isn't the bottleneck due to disk I/O.
 \end{frame}
 
 \end{document}
