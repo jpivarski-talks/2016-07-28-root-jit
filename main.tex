@@ -90,7 +90,7 @@
 %  \tableofcontents
 %\end{frame}
 
-\begin{frame}{Histogram abstraction as fast as C++}
+\begin{frame}{Start with the punchline}
 \vspace{0.25 cm}
 Wall time to fill 100-bin histogram with {\tt \small 2*x}, selecting on {\tt \small !y}.
 
@@ -168,19 +168,9 @@ root_ttree.Draw("2 * x >>+ control3", "!y", "goff")
 \vspace{-0.5 cm}
 \begin{minipage}{0.8\linewidth}
 \begin{lstlisting}[language=python]
-class Entry(object):
-    __slots__ = ["y", "x"]
-    def __init__(self, y, x):
-        self.y = y
-        self.x = x
-\end{lstlisting}
-\end{minipage}
-
-\vspace{-0.25 cm}
-\begin{minipage}{\linewidth}
-\begin{lstlisting}[language=python]
 experiment1 = Select(lambda t: not t.y,
-                  Bin(100, -10, 10, lambda t: 2 * t.x))
+                  Bin(100, -10, 10,
+                      lambda t: 2 * t.x))
 # start stopwatch
 for t in list_of_entries:
     experiment1.fill(t)
@@ -188,6 +178,7 @@ for t in list_of_entries:
 \end{lstlisting}
 \end{minipage}
 
+\vspace{0.5 cm}
 \hfill \textcolor{darkblue}{with Numpy}
 
 \vspace{-0.5 cm}
@@ -207,6 +198,7 @@ experiment2.numpy(dict_of_numpy_arrays)
 \end{lstlisting}
 \end{minipage}
 
+\vspace{0.5 cm}
 \hfill \textcolor{darkblue}{with ROOT}
 
 \vspace{-0.5 cm}
@@ -227,15 +219,119 @@ experiment3.cling(root_ttree)
 \end{minipage}
 \end{frame}
 
-\begin{frame}[fragile]{What Histogrammar-ROOT does}
+\begin{frame}{Dissect the differences}
+\vspace{0.5 cm}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{l c}
+ROOT C++ with TTree read and histogram fill & 198 ms \\
+ROOT C++ filling histogram with zeros & 25 ms \\
+C++ empty for loop & 5 ms \\
+ & \\
+Histogrammar-Cling with TTree read and histogram fill & 196 ms \\
+Histogrammar-Cling filling histogram with zeros & 19 ms \\
+C++ empty for loop & 5 ms \\
+\end{tabular}
+
+\vspace{1 cm}
+ROOT C++ and Histogrammar-Cling are equivalent because they both call {\tt\small ttree->GetEntry(i)}, which takes 90\% of the time.
+\end{frame}
+
+\begin{frame}{}
+\begin{center}
+\textcolor{darkblue}{\Large Back to the beginning for some context}
+\end{center}
+\end{frame}
+
+\begin{frame}[fragile]{Grammar of histograms}
+\vspace{0.5 cm}
+\begin{center}
+\includegraphics[width=0.5\linewidth]{histogrammar-logo.png}
+\end{center}
+
+\textcolor{darkblue}{A suite of classes that each aggregate a simple thing and can aggregate complex things when combined.}
+
 \vspace{0.35 cm}
-Python call generates specific C++ code, compiled by gInterpreter.
+For instance, an ordinary histogram:
 
 \begin{lstlisting}[language=python]
-experiment3 = Select("!y", Bin(100, -10, 10, "2*x"))
-experiment3.cling(root_ttree)
+histogram = Bin(10, -5, 5, "pt", Count())
 \end{lstlisting}
 
+and a histogram with {\tt\small Sumw2}:
+
+\begin{lstlisting}[language=python]
+histogram = Bin(10, -5, 5, "pt", Branch(Count(), Count("x**2")))
+\end{lstlisting}
+
+The content in each bin is now a count {\it and} a sum of weights squared.
+
+\begin{center}
+\textcolor{darkblue}{\url{http://histogrammar.org}}
+\end{center}
+\end{frame}
+
+\begin{frame}{Catalog of primitives}
+
+\vspace{0.5 cm}
+\begin{columns}
+\column{0.45\linewidth}
+\textcolor{darkblue}{\bf Count:} sum of weights \\
+\textcolor{darkblue}{\bf Sum:} sum of anything \\
+\textcolor{darkblue}{\bf Average:} average \\
+\textcolor{darkblue}{\bf Deviate:} average and variance (for a profile plot) \\
+\textcolor{darkblue}{\bf Minimize:} minimum value \\
+\textcolor{darkblue}{\bf Maximize:} maximum value \\
+\textcolor{darkblue}{\bf Fraction:} ratio of contents (for an efficiency plot) \\
+\textcolor{darkblue}{\bf Stack:} cumulative filling \\
+\textcolor{darkblue}{\bf Select:} apply a cut \\
+\textcolor{darkblue}{\bf Limit:} drop detail when large
+
+\column{0.6\linewidth}
+\textcolor{darkblue}{\bf Bin:} regular binning (normal histogram) \\
+\textcolor{darkblue}{\bf SparselyBin:} bins in a hashmap \\
+\textcolor{darkblue}{\bf CentrallyBin:} irregular bins defined by the centers of each bin \\
+\textcolor{darkblue}{\bf IrregularlyBin:} \ldots defined by edges \\
+\textcolor{darkblue}{\bf Categorize:} bin unique by string value (bar chart as a kind of histogram) \\
+\textcolor{darkblue}{\bf Label:} directory with string-based keys \\
+\textcolor{darkblue}{\bf UntypedLabel:} no type restrictions \\
+\textcolor{darkblue}{\bf Index:} homogeneous list \\
+\textcolor{darkblue}{\bf Branch:} heterogeneous tuple \\
+\textcolor{darkblue}{\bf Bag:} accumulate raw data (scatter) \\
+\end{columns}
+
+\vspace{0.25 cm}
+\begin{itemize}
+\item All are one-pass, commutative, and associative (parallelizable).
+\item Implement in Python, Scala, \textcolor{gray}{C++, Julia,} \textcolor{lightgray}{R, Javascript\ldots}
+\item Many filling back-ends, plotting front-ends, including ROOT.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Using ROOT as a back-end}
+When a user types
+
+\begin{center}
+\begin{minipage}{0.9\linewidth}
+\begin{lstlisting}[language=python, basicstyle=\ttfamily\small]
+h = Select("!y", Bin(100, -10, 10, "2 * x"))
+h.cling(root_ttree)
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+Histogrammar-Python generates C++ code
+
+\begin{itemize}
+\item for this specific combination ({\tt\small Select-Bin-Count})
+\item for this specific TTree
+\item with these derived fields
+\end{itemize}
+
+and sends it to Cling to compile and run.
+\end{frame}
+
+\begin{frame}[fragile]{The code generated in this example}
+\vspace{0.5 cm}
 \begin{columns}
 \column{0.35\linewidth}
 \begin{lstlisting}[language=cpp, basicstyle=\ttfamily\fontsize{5}{4}\selectfont]
@@ -316,26 +412,31 @@ public:
 };
 \end{lstlisting}
 \end{columns}
-
-One contiguous block of memory; no allocations in loop; just ``{\tt\scriptsize if}.''
 \end{frame}
 
-\begin{frame}{Dissect the differences}
-\vspace{0.5 cm}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{l c}
-ROOT C++ with TTree read and histogram fill & 198 ms \\
-ROOT C++ filling histogram with zeros & 25 ms \\
-C++ empty for loop & 5 ms \\
- & \\
-Histogrammar-Cling with TTree read and histogram fill & 196 ms \\
-Histogrammar-Cling filling histogram with zeros & 19 ms \\
-C++ empty for loop & 5 ms \\
-\end{tabular}
+\begin{frame}{Properties of this code}
 
-\vspace{1 cm}
-ROOT C++ and Histogrammar-Cling are equivalent because they both call {\tt\small ttree->GetEntry(i)}, which takes 90\% of the time.
+\begin{itemize}\setlength{\itemsep}{0.35 cm}
+\item Arbitrarily deep nesting: any aggregator that can be constructed out of primitives generates working C++ code.
+\item Human-readable for debugging, with good indentation.
+\item All but three primitives ({\tt\small SparselyBin}, {\tt\small Categorize}, {\tt\small Bag}) generate memory-contiguous code, and nothing is allocated in the loop (not even on the stack). It should use a CPU cache efficiently.
+\item Repeated expressions are computed once.
+\item Expressions are sanitized, with code-transformations applied to the abstract syntax tree (AST), not raw strings.
+\end{itemize}
 \end{frame}
+
+\begin{frame}{What this means for a }
+
+
+
+
+
+
+\end{frame}
+
+
+
+
 
 \begin{frame}[fragile]{Analysis code must be declarative to use it}
 \vspace{0.1 cm}
