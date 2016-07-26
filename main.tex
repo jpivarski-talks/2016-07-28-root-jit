@@ -234,13 +234,13 @@ experiment3.cling(root_ttree)
 \textcolor{darkblue}{A suite of classes that each aggregate a simple thing and can aggregate complex things when combined.}
 
 \vspace{0.35 cm}
-For instance, an ordinary histogram:
+For instance, an ordinary histogram is
 
 \begin{lstlisting}[language=python]
 histogram = Bin(10, -5, 5, "pt", Count())
 \end{lstlisting}
 
-and a histogram with {\tt\small Sumw2}:
+and a histogram with {\tt\small Sumw2} is
 
 \begin{lstlisting}[language=python]
 histogram = Bin(10, -5, 5, "pt", Branch(Count(), Count("x**2")))
@@ -286,7 +286,7 @@ The content in each bin is now a count {\it and} a sum of weights squared.
 \begin{itemize}
 \item All are one-pass, commutative, and associative (parallelizable).
 \item Implement in Python, Scala, \textcolor{gray}{C++, Julia,} \textcolor{lightgray}{R, Javascript\ldots}
-\item Many filling back-ends, plotting front-ends, including ROOT.
+\item Back-ends for filling, front-ends for plotting, including ROOT.
 \end{itemize}
 \end{frame}
 
@@ -305,9 +305,9 @@ h.cling(root_ttree)
 Histogrammar-Python generates C++ code
 
 \begin{itemize}
-\item for this specific combination ({\tt\small Select-Bin-Count})
-\item for this specific TTree
-\item with these derived fields
+\item for this specific combination ({\tt\small Select-Bin-Count}),
+\item for this specific TTree,
+\item with these derived fields.
 \end{itemize}
 
 and sends it to Cling to compile and run.
@@ -501,12 +501,31 @@ import histogrammar as hg10
 Target an upcoming ROOT 6 release, rather than ROOT 7?
 \end{frame}
 
-\begin{frame}{Backup: why not this syntax?}
+\begin{frame}[fragile]{Backup: why not this syntax?}
 
+\vspace{0.5 cm}
+\fbox{\tt\small root\_tree.Filter("!y").Map("2*x").Bin(100, -10, 10)}
 
+\vspace{0.2 cm}
+The ``chains of functional primitives'' should implement {\tt Filter} and {\tt Map} as above. These are different from Histogrammar's primitives.
 
+\begin{itemize}
+\item Histogrammar has its own {\tt Select} because it applies different cuts to different parts of the aggregation tree.
+\item Histogrammar primitives have their own fill rules (rather than relying on an upstream {\tt Map}) because they are projections of complex events onto plotable number lines.
+\item So you can do this:
+\end{itemize}
 
-
+\begin{minipage}{1.05\linewidth}
+\begin{lstlisting}[language=python, basicstyle=\ttfamily\scriptsize]
+functional_chains.Histogrammar(UntypedLabel(
+    plot1 = Select("jet.pt > 20", Bin(100, -5, 5, "muon.pt")),
+    plot2 = Bin(10, 0, 100, "jet.pt", Bin(10, -5, 5, "muon.pt")),
+    frac = Fraction("trigger", Bin(100, 0, 100, "jet.pt")),
+    weirdo = Branch(..., Select(...)),
+    ...
+    ))
+\end{lstlisting}
+\end{minipage}
 \end{frame}
 
 \begin{frame}{Backup: time is dominated by TTree-reading}
